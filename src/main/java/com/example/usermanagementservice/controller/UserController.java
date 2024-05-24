@@ -4,6 +4,7 @@ import com.example.usermanagementservice.dto.PatchUserRequestDto;
 import com.example.usermanagementservice.dto.UpdateUserRequestDto;
 import com.example.usermanagementservice.dto.UserResponseDto;
 import com.example.usermanagementservice.model.User;
+import com.example.usermanagementservice.security.UserContext;
 import com.example.usermanagementservice.service.UserInfoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(value = "/users")
 public class UserController {
     private final UserInfoService userInfoService;
+    private final UserContext userContext;
 
     @PreAuthorize("hasAnyAuthority('ROLE_USER', 'ROLE_ADMIN')")
     @GetMapping("/{userId}")
@@ -44,9 +45,8 @@ public class UserController {
     @PutMapping
     @Operation(summary = "Update a user", description = "Update user information")
     public UserResponseDto updateUser(
-            Authentication authentication,
             @Valid @RequestBody UpdateUserRequestDto updateUserRequestDto) {
-        User user = (User) authentication.getPrincipal();
+        User user = userContext.getCurrentUser();
         return userInfoService.updateUser(user.getId(), updateUserRequestDto);
     }
 
@@ -54,9 +54,8 @@ public class UserController {
     @PatchMapping
     @Operation(summary = "Patch a user", description = "Patch user information")
     public UserResponseDto patchUser(
-            Authentication authentication,
             @Valid @RequestBody PatchUserRequestDto patchUserRequestDto) {
-        User user = (User) authentication.getPrincipal();
+        User user = userContext.getCurrentUser();
         return userInfoService.patchUser(user.getId(), patchUserRequestDto);
     }
 
@@ -64,8 +63,8 @@ public class UserController {
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a user", description = "Delete a user")
-    public void deleteUser(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
+    public void deleteUser() {
+        User user = userContext.getCurrentUser();
         userInfoService.deleteUser(user.getId());
     }
 

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
+import com.example.usermanagementservice.dto.PatchUserRequestDto;
 import com.example.usermanagementservice.dto.UpdateUserRequestDto;
 import com.example.usermanagementservice.dto.UserResponseDto;
 import com.example.usermanagementservice.exception.DuplicateEmailException;
@@ -12,6 +13,7 @@ import com.example.usermanagementservice.mapper.UserMapper;
 import com.example.usermanagementservice.model.User;
 import com.example.usermanagementservice.repository.UserRepository;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeAll;
@@ -32,6 +34,10 @@ class UserInfoServiceImplTest {
             = "$2a$10$aatOGGMyH/ni2OcIHtR0A.J3m814SzQ9nJa0vkawqTSRqIhGyE/Oq";
     private static final Long ID_OF_USER_FOR_UPDATE_WITH_DUPLICATE_EMAIL = 11L;
     private static final String RESERVED_EMAIL = "example1234@example.com";
+    private static final Long ID_OF_USER_FOR_PATCH = 11L;
+    private static final Long ID_OF_USER_FOR_PATCH_WITH_DUPLICATE_EMAIL = 11L;
+    private static final LocalDate FROM = LocalDate.parse("1989-01-05");
+    private static final LocalDate TO = LocalDate.parse("2001-01-05");
     private static User user;
     private static UserResponseDto userResponseDto;
     private static UpdateUserRequestDto updateUserRequestDto;
@@ -40,6 +46,13 @@ class UserInfoServiceImplTest {
     private static User updatedUser;
     private static UserResponseDto updatedUserResponseDto;
     private static UpdateUserRequestDto updateUserRequestDtoWithDuplicateEmail;
+    private static User userToBePatched;
+    private static User patchedUser;
+    private static PatchUserRequestDto patchUserRequestDto;
+    private static UserResponseDto patchedUserResponseDto;
+    private static PatchUserRequestDto patchUserRequestDtoWithDuplicateEmail;
+    private static User user2;
+    private static UserResponseDto userResponseDto2;
 
     @Mock
     private UserRepository userRepository;
@@ -130,6 +143,65 @@ class UserInfoServiceImplTest {
                 .setBirthDate(LocalDate.parse("1995-05-21"))
                 .setAddress("Kyiv")
                 .setPhoneNumber("4321004321");
+
+        userToBePatched = new User()
+                .setId(ID_OF_USER_FOR_PATCH)
+                .setEmail("example1111@example.com")
+                .setPassword("$2a$10$FIx9jqvWv.FAKTmVM4A7Ru/Jb3275kln/RAfDFpQEE.pX4UCWsnfS")
+                .setFirstName("David")
+                .setLastName("Smith")
+                .setBirthDate(LocalDate.parse("1995-05-21"))
+                .setAddress("Sumy")
+                .setPhoneNumber("5656878734")
+                .setRoles(Set.of());
+
+        patchedUser = new User()
+                .setId(ID_OF_USER_FOR_PATCH)
+                .setEmail("example1111@example.com")
+                .setPassword("$2a$10$FIx9jqvWv.FAKTmVM4A7Ru/Jb3275kln/RAfDFpQEE.pX4UCWsnfS")
+                .setFirstName("David")
+                .setLastName("Smith")
+                .setBirthDate(LocalDate.parse("1995-05-21"))
+                .setAddress("Poltava")
+                .setPhoneNumber("9876543210")
+                .setRoles(Set.of());
+
+        patchUserRequestDto = new PatchUserRequestDto()
+                .setAddress("Poltava")
+                .setPhoneNumber("9876543210");
+
+        patchedUserResponseDto = new UserResponseDto()
+                .setId(ID_OF_USER_FOR_PATCH)
+                .setEmail("example1111@example.com")
+                .setFirstName("David")
+                .setLastName("Smith")
+                .setBirthDate(LocalDate.parse("1995-05-21"))
+                .setAddress("Poltava")
+                .setPhoneNumber("9876543210");
+
+        patchUserRequestDtoWithDuplicateEmail = new PatchUserRequestDto()
+                .setEmail(RESERVED_EMAIL)
+                .setAddress("Poltava")
+                .setPhoneNumber("9876543210");
+
+        user2 = new User()
+                .setId(3L)
+                .setEmail("example4400@example.com")
+                .setPassword("$2a$10$nqiHTVWKSLdqo6e7tTmuv.lK0/d8Fd3YAFw1C4H3Gelcywoy5iAb.")
+                .setFirstName("William")
+                .setLastName("Garcia")
+                .setBirthDate(LocalDate.parse("2000-12-02"))
+                .setAddress("Vinnytsia")
+                .setPhoneNumber("4362639578");
+
+        userResponseDto2 = new UserResponseDto()
+                .setId(3L)
+                .setEmail("example4400@example.com")
+                .setFirstName("William")
+                .setLastName("Garcia")
+                .setBirthDate(LocalDate.parse("2000-12-02"))
+                .setAddress("Vinnytsia")
+                .setPhoneNumber("4362639578");
     }
 
     @Test
@@ -197,6 +269,74 @@ class UserInfoServiceImplTest {
         );
 
         String expected = "User with this email is already registered";
+        String actual = exception.getMessage();
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    @DisplayName("Patch the address and phone number of a user")
+    void patchUser_ValidRequestDto_ReturnsUserResponseDto() {
+        when(userRepository.findById(ID_OF_USER_FOR_PATCH))
+                .thenReturn(Optional.of(userToBePatched));
+        when(userRepository.save(patchedUser))
+                .thenReturn(patchedUser);
+        when(userMapper.toUserResponseDto(patchedUser))
+                .thenReturn(patchedUserResponseDto);
+
+        UserResponseDto expected = patchedUserResponseDto;
+        UserResponseDto actual
+                = userInfoService.patchUser(ID_OF_USER_FOR_PATCH, patchUserRequestDto);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    @DisplayName("Patch a user's email with the email of another user")
+    void patchUser_DuplicateEmail_ThrowsDuplicateEmailException() {
+        when(userRepository.findById(ID_OF_USER_FOR_PATCH_WITH_DUPLICATE_EMAIL))
+                .thenReturn(Optional.of(userToBePatched));
+        when(userRepository.findByEmail(RESERVED_EMAIL))
+                .thenReturn(Optional.of(user));
+
+        Exception exception = assertThrows(
+                DuplicateEmailException.class,
+                () -> userInfoService.patchUser(
+                        ID_OF_USER_FOR_PATCH_WITH_DUPLICATE_EMAIL,
+                        patchUserRequestDtoWithDuplicateEmail)
+        );
+
+        String expected = "User with this email is already registered";
+        String actual = exception.getMessage();
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    @DisplayName("Find users between FROM and TO dates")
+    void findUsersByBirthDateRange_ValidBirthDateRange_ReturnsUserResponseDtoList() {
+        when(userRepository.findByBirthDateBetween(FROM, TO))
+                .thenReturn(List.of(user, user2));
+        when(userMapper.toUserResponseDto(user))
+                .thenReturn(userResponseDto);
+        when(userMapper.toUserResponseDto(user2))
+                .thenReturn(userResponseDto2);
+
+        List<UserResponseDto> expected = List.of(userResponseDto, userResponseDto2);
+        List<UserResponseDto> actual = userInfoService.findUsersByBirthDateRange(FROM, TO);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    @DisplayName("Find users between TO and FROM dates")
+    void findUsersByBirthDateRange_FromAndToDatesInverted_ThrowsIllegalArgumentException() {
+        Exception exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> userInfoService.findUsersByBirthDateRange(TO, FROM)
+        );
+
+        String expected = "\"From\" date must be less than \"To\" date.";
         String actual = exception.getMessage();
 
         assertEquals(expected, actual);
